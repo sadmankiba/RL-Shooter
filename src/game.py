@@ -13,11 +13,21 @@ from pygame.locals import (
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
+SCORE_HEIGHT = 80
+ADDENEMY = pygame.USEREVENT + 1
+
+ENEMY_ADD_TIMER = 2000
+
+PLAYER_SIZE = (75, 25)
+ENEMY_SIZE = (20, 10)
+
+BLACK = (0, 0, 0)
+YELLOW = (255, 255, 102)
 
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super(Player, self).__init__()
-        self.surf = pygame.Surface((75, 25))
+        self.surf = pygame.Surface(PLAYER_SIZE)
         self.surf.fill((255, 255, 255))
         self.rect = self.surf.get_rect()
     
@@ -35,73 +45,90 @@ class Player(pygame.sprite.Sprite):
             self.rect.left = 0
         if self.rect.right > SCREEN_WIDTH:
             self.rect.right = SCREEN_WIDTH
-        if self.rect.top <= 0:
-            self.rect.top = 0
+        if self.rect.top <= SCORE_HEIGHT:
+            self.rect.top = SCORE_HEIGHT
         if self.rect.bottom >= SCREEN_HEIGHT:
             self.rect.bottom = SCREEN_HEIGHT
 
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
         super(Enemy, self).__init__()
-        self.surf = pygame.Surface((20, 10))
+        self.surf = pygame.Surface(ENEMY_SIZE)
         self.surf.fill((255, 255, 255))
         self.rect = self.surf.get_rect(
             center=(
                 random.randint(SCREEN_WIDTH + 20, SCREEN_WIDTH + 100),
-                random.randint(0, SCREEN_HEIGHT),
+                random.randint(SCORE_HEIGHT + 20, SCREEN_HEIGHT),
             )
         )
-        self.speed = random.randint(5, 20)
+        self.speed = random.random() + 0.5
 
     def update(self):
         self.rect.move_ip(-self.speed, 0)
-        if self.rect.right < 0:
-            self.kill()
 
-if __name__ == "__main__":
-    pygame.init()
 
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+class Game:
+    def __init__(self) -> None:
+        self._screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
-    ADDENEMY = pygame.USEREVENT + 1
-    pygame.time.set_timer(ADDENEMY, 250)
+        self._running = True
+        self._player = Player()
+        self._enemies = pygame.sprite.Group()
+        self._all_sprites = pygame.sprite.Group()
+        self._all_sprites.add(self._player)
+        self._score = 0
 
-    player = Player()
+        pygame.time.set_timer(ADDENEMY, ENEMY_ADD_TIMER)
+        
+    def run(self):
+        while self._running:
+            self._check_event()
+            pressed_keys = pygame.key.get_pressed()
 
-    enemies = pygame.sprite.Group()
-    all_sprites = pygame.sprite.Group()
-    all_sprites.add(player)
+            self._player.update(pressed_keys)
+            self._enemies.update()
 
-    running = True
+            self._screen.fill(BLACK)
 
-    while running:
+            for entity in self._all_sprites:
+                self._screen.blit(entity.surf, entity.rect)
+
+            for enemy in self._enemies:
+                if enemy.rect.right < 0: 
+                    self._running = False
+
+                if pygame.sprite.collide_rect(enemy, self._player):
+                    self._score += 1
+                    enemy.kill()
+
+            self._update_score()
+            pygame.display.flip()
+
+            clock.tick(60)
+
+    def _check_event(self):
         for event in pygame.event.get():
             if event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
-                    running = False
+                    self._running = False
 
             elif event.type == QUIT:
-                running = False
+                self._running = False
             
             elif event.type == ADDENEMY:
                 new_enemy = Enemy()
-                enemies.add(new_enemy)
-                all_sprites.add(new_enemy)
+                self._enemies.add(new_enemy)
+                self._all_sprites.add(new_enemy)
 
-        pressed_keys = pygame.key.get_pressed()
+    def _update_score(self):
+        value = score_font.render("Your Score: " + str(self._score), True, YELLOW)
+        self._screen.blit(value, [0, 0])
 
-        player.update(pressed_keys)
-
-        enemies.update()
-
-        screen.fill((0, 0, 0))
-
-        for entity in all_sprites:
-            screen.blit(entity.surf, entity.rect)
-
-        if pygame.sprite.spritecollideany(player, enemies):
-            player.kill()
-            running = False
-
-        pygame.display.flip()
-
+if __name__ == "__main__":
+    pygame.init()
+    score_font = pygame.font.SysFont("comicsansms", 20)
+    
+    clock = pygame.time.Clock()
+    
+    game = Game() 
+    game.run()
