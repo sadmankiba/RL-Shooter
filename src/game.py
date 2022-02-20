@@ -153,12 +153,11 @@ class ShooterEnv:
         self._game.step(a)
 
         rew = self._game.score - prev_scr
-        self.state = self._scr_proc()
-
         done = False
-
         if not self._game.running:
             done = True
             self._game.start()
 
+        self.state = self._scr_proc()
+        
         return self.state, rew, done
