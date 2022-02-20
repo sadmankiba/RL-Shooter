@@ -48,7 +48,7 @@ STATE_IMG_W = 40
 T_STATE = NDArray[(STATE_IMG_H, STATE_IMG_W), int]
 T_Action = int
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("model-logger")
 
 class Action:
@@ -271,6 +271,7 @@ class ShooterEnv:
         done = False
         if (not self._game.running) or self._n_steps >= self._MAX_STEPS:
             done = True
+            rew += -0.5
             self._game.start()
             self.games_played += 1
             self._n_steps = 0

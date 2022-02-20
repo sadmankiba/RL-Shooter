@@ -1,6 +1,7 @@
 import random
 import inspect
 import collections
+from datetime import datetime
 
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
@@ -19,11 +20,11 @@ EPSILON_INIT = 1.0
 EPSILON_DEC_SCALE = 0.99
 PLAY_STEPS = 10
 REPLAY_SAMPLE_TRAIN_SIZE = 64
-ITER_UPDATE_TARGET_MODEL = 5
+ITER_UPDATE_TARGET_MODEL = 50
 ITER_DEC_EPSILON = 100
 ITER_UPDATE_HISTORY = 200
-ITER_SAVE_IMG = 10
-ITER_SAVE_WEIGHTS = 10
+ITER_SAVE_IMG = 200
+ITER_SAVE_WEIGHTS = 200
 REPLAY_BUFFER_SIZE = 1000
 
 
@@ -69,7 +70,7 @@ class Agent:
         m = Sequential()
         m.add(
             Conv2D(
-                5,
+                8,
                 (6, 6),
                 strides=2,
                 padding="same",
@@ -81,7 +82,7 @@ class Agent:
         m.add(MaxPool2D((2, 2), strides=2))
         m.add(
             Conv2D(
-                10,
+                16,
                 (5, 5),
                 activation="relu",
                 padding="same",
@@ -90,6 +91,7 @@ class Agent:
         )
         m.add(MaxPool2D((2, 2)))
         m.add(Flatten())
+        m.add(Dense(20, activation="relu", kernel_initializer="he_uniform"))
         m.add(Dense(len(self._env.actions), activation=None))
         m.compile(Adam(lr), loss=tf.keras.losses.Huber())
         return m
@@ -125,7 +127,7 @@ class Agent:
             if i != 0 and i % ITER_SAVE_WEIGHTS == 0:
                 self._target_model.save(
                     f"{parent_dir(inspect.currentframe()).parent}"
-                    f"/saved_weights/target_model_{i}.h5"
+                    f"/saved_weights/target_model_{i}_{datetime.now().strftime('%H_%M')}.h5"
                 )
 
             log.debug(f"[TRAIN]: iter {i}")
