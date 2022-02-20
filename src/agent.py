@@ -11,7 +11,8 @@ import numpy as np
 from nptyping import NDArray
 
 from constants import UP, DOWN
-from game import ShooterEnv, T_STATE, T_Action, STATE_IMG_H, STATE_IMG_W
+from game import ShooterEnv, T_STATE, T_Action, STATE_IMG_H, STATE_IMG_W, Action, log
+from util import FileSave
 
 EPSILON_INIT = 1.0
 EPSILON_DEC_SCALE = 0.99
@@ -20,6 +21,7 @@ REPLAY_SAMPLE_TRAIN_SIZE = 64
 ITER_UPDATE_TARGET_MODEL = 100
 ITER_DEC_EPSILON = 100
 ITER_UPDATE_HISTORY = 200
+ITER_SAVE_IMG = 20
 REPLAY_BUFFER_SIZE = 1000
 
 
@@ -95,29 +97,8 @@ class Agent:
         total_loss = 0
         for i in range(n):
             self._play_and_record(PLAY_STEPS)
-            batch = self._rep.sample(REPLAY_SAMPLE_TRAIN_SIZE)
-            q_nxt_batch = np.squeeze(
-                self._target_model.predict(self._prep_state_img(batch["s_nxt"]))
-            )
-            v_nxt_batch = np.max(q_nxt_batch, axis=1)
-            q_ref_batch = batch["rew"] + self.GAMMA * v_nxt_batch * (1 - batch["done"])
-
-            inp_batch = self._prep_state_img(batch["s"])
-            a_batch = batch["a"]
-            with tf.GradientTape() as tape:
-                q_current = self._model(inp_batch)
-                one_hot_actions = to_categorical(
-                    a_batch, len(self._env.actions), dtype=np.float32
-                )
-                q_a = tf.reduce_sum(tf.multiply(q_current, one_hot_actions), axis=1)
-                loss = Huber()(q_ref_batch, q_a)
-
+            loss = self._update_model_from_batch()
             total_loss += loss
-
-            model_gradients = tape.gradient(loss, self._model.trainable_variables)
-            self._model.optimizer.apply_gradients(
-                zip(model_gradients, self._model.trainable_variables)
-            )
 
             if i != 0 and i % ITER_UPDATE_TARGET_MODEL == 0:
                 self._target_model.set_weights(self._model.get_weights())
@@ -128,13 +109,43 @@ class Agent:
             if i != 0 and i % ITER_UPDATE_HISTORY == 0:
                 history["mean_rew"].append(self._evaluate(5))
                 history["mean_loss"].append(total_loss / ITER_UPDATE_HISTORY)
-                print(
+                log.info(
                     f"iter: {i}/{n}, games played: {self._env.games_played}"
                     f", mean reward: {history['mean_rew'][-1]}, loss: {history['mean_loss'][-1]}"
                 )
                 total_loss = 0
+            
+            if i != 0 and i % ITER_SAVE_IMG == 0: 
+                batch = self._rep.sample(10)
+                for s, a, rew in zip(batch["s"], batch["a"], batch["rew"]):
+                    FileSave.fig(s, f"act_{Action.rev(a)}_rew_{rew}")
+            
+            log.debug(f"[TRAIN]: iter {i}")
 
         return history
+
+    def _update_model_from_batch(self):
+        batch = self._rep.sample(REPLAY_SAMPLE_TRAIN_SIZE)
+        q_nxt_batch = self._target_model.predict(self._prep_state_img(batch["s_nxt"]))
+        
+        v_nxt_batch = np.max(q_nxt_batch, axis=1)
+        q_ref_batch = batch["rew"] + self.GAMMA * v_nxt_batch * (1 - batch["done"])
+
+        inp_batch = self._prep_state_img(batch["s"])
+        a_batch = batch["a"]
+        with tf.GradientTape() as tape:
+            q_current = self._model(inp_batch)
+            one_hot_actions = to_categorical(
+                a_batch, len(self._env.actions), dtype=np.float32
+            )
+            q_a = tf.reduce_sum(tf.multiply(q_current, one_hot_actions), axis=1)
+            loss = Huber()(q_ref_batch, q_a)
+
+        model_gradients = tape.gradient(loss, self._model.trainable_variables)
+        self._model.optimizer.apply_gradients(
+            zip(model_gradients, self._model.trainable_variables)
+        )
+        return loss
 
     def _play_and_record(self, steps: int):
         s = self._env.state

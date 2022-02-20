@@ -31,8 +31,8 @@ ENEMY_ADD_TIMER = 2000
 PLAYER_SIZE = (25, 75)
 PLAYER_IMG_SIZE = (75, 75)
 ENEMY_SIZE = (25, 50)
-ENEMY_IMG_SIZE = (60, 60)
-MISSILE_SIZE = (10, 5)
+ENEMY_IMG_SIZE = (90, 90)
+MISSILE_SIZE = (3, 1)
 MISSILE_IMG_SIZE = (24, 24)
 
 PLAYER_MOVE_STEP = 20
@@ -56,9 +56,21 @@ class Action:
     UP = 0
     DOWN = 1
     NOP = 2
+    SHOOT = 3
 
     def __len__(self):
-        return 3
+        return 4
+    
+    @classmethod
+    def rev(self, a: int):
+        if a == 0: 
+            return "up"
+        elif a == 1: 
+            return "down"
+        elif a == 2: 
+            return "nop"
+        elif a == 3: 
+            return "shoot"
 
 
 class Player(pygame.sprite.Sprite):
@@ -68,13 +80,13 @@ class Player(pygame.sprite.Sprite):
         if use_img:
             self.surf = pygame.image.load(
                 f"{parent_dir(inspect.currentframe()).parent}/assets/spaceship.png"
-            ).convert()
+            ).convert_alpha()
         else:
             self.surf = pygame.Surface(PLAYER_SIZE)
             self.surf.fill(WHITE)
         self.rect = self.surf.get_rect(
             center=(
-                int(PLAYER_SIZE[0] / 1.7),
+                int(PLAYER_SIZE[0] / 1.5),
                 random.randint(
                     int(SCORE_HEIGHT + PLAYER_SIZE[1] / 2),
                     int(SCREEN_HEIGHT - PLAYER_SIZE[1] / 2),
@@ -101,7 +113,7 @@ class Missile(pygame.sprite.Sprite):
         if use_img:
             self.surf = pygame.image.load(
                 f"{parent_dir(inspect.currentframe()).parent}/assets/missile.png"
-            ).convert()
+            ).convert_alpha()
         else:
             self.surf = pygame.Surface(MISSILE_SIZE)
             self.surf.fill(WHITE)
@@ -137,10 +149,11 @@ class Enemy(pygame.sprite.Sprite):
 
 
 class Game:
-    def __init__(self, fps: int) -> None:
+    def __init__(self, fps: int, display: bool) -> None:
         pygame.init()
         pygame.time.set_timer(ADDENEMY, ENEMY_ADD_TIMER)
         self._fps = fps
+        self._display = display
         self._score_font = pygame.font.SysFont("comicsansms", 20)
         self._screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self._clock = pygame.time.Clock()
@@ -158,7 +171,9 @@ class Game:
     def run(self):
         while self.running:
             pressed_keys = pygame.key.get_pressed()
-            if pressed_keys[K_UP]:
+            if self._check_click():
+                a = Action.SHOOT
+            elif pressed_keys[K_UP]:
                 a = Action.UP
             elif pressed_keys[K_DOWN]:
                 a = Action.DOWN
@@ -169,7 +184,14 @@ class Game:
 
     def step(self, a: T_Action):
         self._check_event()
-        self._player.update(a)
+
+        if a == Action.SHOOT:
+            m = Missile(self._player.rect.centerx, self._player.rect.centery)
+            self._missiles.add(m)
+            self._all_sprites.add(m)
+        elif a == Action.UP or a == Action.DOWN:
+            self._player.update(a)
+        
         self._enemies.update()
         self._missiles.update()
 
@@ -192,7 +214,9 @@ class Game:
 
         self._render_score()
 
-        pygame.display.flip()
+        if self._display:
+            pygame.display.flip()
+        
         self._clock.tick(self._fps)
 
     def _check_event(self):
@@ -208,10 +232,12 @@ class Game:
                 self._enemies.add(new_enemy)
                 self._all_sprites.add(new_enemy)
 
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                m = Missile(self._player.rect.centerx, self._player.rect.centery)
-                self._missiles.add(m)
-                self._all_sprites.add(m)
+    def _check_click(self):
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                return True
+        
+        return False
 
     def _render_score(self):
         value = self._score_font.render("Your Score: " + str(self.score), True, YELLOW)
@@ -230,10 +256,12 @@ class ShooterEnv:
 
     def _scr_proc(self) -> T_STATE:
         scr = pygame.surfarray.array3d(pygame.display.get_surface())
+        scr = np.transpose(scr, axes=[1, 0, 2])
+        scr = scr[SCORE_HEIGHT:, :, :]
         scr = cv2.cvtColor(
             cv2.resize(scr, (STATE_IMG_H, STATE_IMG_W)), cv2.COLOR_BGR2GRAY
         )
-        _, scr = cv2.threshold(scr, 1, 255, cv2.THRESH_BINARY)
+        # _, scr = cv2.threshold(scr, 50, 255, cv2.THRESH_BINARY)
         return np.array(scr)
 
     def step(self, a: T_Action) -> tuple[Any, int, bool]:
@@ -250,6 +278,6 @@ class ShooterEnv:
             self._n_steps = 0
 
         self.state = self._scr_proc()
-        log.debug(f"[ENV-STEP]: act {a}, s_nxt {self.state.tolist()}, rew {rew}, done {done}")
+        # log.debug(f"[ENV-STEP]: act {a}, s_nxt {self.state.tolist()}, rew {rew}, done {done}")
         
         return self.state, rew, done

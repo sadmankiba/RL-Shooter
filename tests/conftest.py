@@ -5,5 +5,5 @@ from constants import TRAIN_FPS
 
 @pytest.fixture
 def game():
-    return Game(TRAIN_FPS)
+    return Game(TRAIN_FPS, False)
 
