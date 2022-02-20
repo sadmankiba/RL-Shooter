@@ -1,4 +1,5 @@
 import random
+import inspect
 import collections
 
 import tensorflow as tf
@@ -12,16 +13,17 @@ from nptyping import NDArray
 
 from constants import UP, DOWN
 from game import ShooterEnv, T_STATE, T_Action, STATE_IMG_H, STATE_IMG_W, Action, log
-from util import FileSave
+from util import FileSave, parent_dir
 
 EPSILON_INIT = 1.0
 EPSILON_DEC_SCALE = 0.99
 PLAY_STEPS = 10
 REPLAY_SAMPLE_TRAIN_SIZE = 64
-ITER_UPDATE_TARGET_MODEL = 100
+ITER_UPDATE_TARGET_MODEL = 5
 ITER_DEC_EPSILON = 100
 ITER_UPDATE_HISTORY = 200
 ITER_SAVE_IMG = 10
+ITER_SAVE_WEIGHTS = 10
 REPLAY_BUFFER_SIZE = 1000
 
 
@@ -114,20 +116,38 @@ class Agent:
                     f", mean reward: {history['mean_rew'][-1]}, loss: {history['mean_loss'][-1]}"
                 )
                 total_loss = 0
-            
-            if i != 0 and i % ITER_SAVE_IMG == 0: 
+
+            if i != 0 and i % ITER_SAVE_IMG == 0:
                 batch = self._rep.sample(10)
                 for s, a, rew in zip(batch["s"], batch["a"], batch["rew"]):
                     FileSave.fig(s, f"act_{Action.rev(a)}_rew_{rew}")
-            
+
+            if i != 0 and i % ITER_SAVE_WEIGHTS == 0:
+                self._target_model.save(
+                    f"{parent_dir(inspect.currentframe()).parent}"
+                    f"/saved_weights/target_model_{i}.h5"
+                )
+
             log.debug(f"[TRAIN]: iter {i}")
 
         return history
 
+    def play_from_saved(self, i: int):
+        self._model = tf.keras.models.load_model(
+            f"{parent_dir(inspect.currentframe()).parent}"
+            f"/saved_weights/target_model_{i}.h5"
+        )
+        
+        s = self._env.state
+        while True:
+            a = self._choose_best_action(s)
+            s_nxt, _, _ = self._env.step(a)
+            s = s_nxt
+
     def _update_model_from_batch(self):
         batch = self._rep.sample(REPLAY_SAMPLE_TRAIN_SIZE)
         q_nxt_batch = self._target_model.predict(self._prep_state_img(batch["s_nxt"]))
-        
+
         v_nxt_batch = np.max(q_nxt_batch, axis=1)
         q_ref_batch = batch["rew"] + self.GAMMA * v_nxt_batch * (1 - batch["done"])
 
