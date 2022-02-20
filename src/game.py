@@ -10,6 +10,8 @@ from pygame.locals import (
     K_ESCAPE,
     KEYDOWN,
     QUIT,
+    K_SPACE,
+    MOUSEBUTTONDOWN,
 )
 import numpy as np
 import cv2
@@ -18,17 +20,20 @@ from nptyping import NDArray
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 SCORE_HEIGHT = 80
-FPS = 500
 ADDENEMY = pygame.USEREVENT + 1
 
 ENEMY_ADD_TIMER = 2000
 
 PLAYER_SIZE = (25, 75)
-ENEMY_SIZE = (25, 15)
+ENEMY_SIZE = (25, 50)
+MISSILE_SIZE = (10, 5)
 
-PLAYER_MOVE_STEP = 25
+PLAYER_MOVE_STEP = 20
+ENEMY_SPEED = 5
+MISSILE_SPEED = 15
 
 BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
 YELLOW = (255, 255, 102)
 
 STATE_IMG_H = 40
@@ -51,10 +56,10 @@ class Player(pygame.sprite.Sprite):
     def __init__(self):
         super(Player, self).__init__()
         self.surf = pygame.Surface(PLAYER_SIZE)
-        self.surf.fill((255, 255, 255))
+        self.surf.fill(WHITE)
         self.rect = self.surf.get_rect(
             center=(
-                int(PLAYER_SIZE[0] / 1.8),
+                int(PLAYER_SIZE[0] / 1.7),
                 random.randint(
                     int(SCORE_HEIGHT + PLAYER_SIZE[1] / 2),
                     int(SCREEN_HEIGHT - PLAYER_SIZE[1] / 2),
@@ -73,30 +78,41 @@ class Player(pygame.sprite.Sprite):
         if self.rect.bottom >= SCREEN_HEIGHT:
             self.rect.bottom = SCREEN_HEIGHT
 
+
 class Missile(pygame.sprite.Sprite):
-    pass
+    def __init__(self, x: int, y: int):
+        super(Missile, self).__init__()
+        self.surf = pygame.Surface(MISSILE_SIZE)
+        self.surf.fill(WHITE)
+        self.rect = self.surf.get_rect(center=(x, y))
+        self.speed = MISSILE_SPEED
+
+    def update(self):
+        self.rect.move_ip(self.speed, 0)
+
 
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
         super(Enemy, self).__init__()
         self.surf = pygame.Surface(ENEMY_SIZE)
-        self.surf.fill((255, 255, 255))
+        self.surf.fill(WHITE)
         self.rect = self.surf.get_rect(
             center=(
                 random.randint(SCREEN_WIDTH + 20, SCREEN_WIDTH + 100),
-                random.randint(SCORE_HEIGHT + 20, SCREEN_HEIGHT),
+                random.randint(SCORE_HEIGHT + 40, SCREEN_HEIGHT - 40),
             )
         )
-        self.speed = random.random() * 2 + 2.5
+        self.speed = ENEMY_SPEED
 
     def update(self):
         self.rect.move_ip(-self.speed, 0)
 
 
 class Game:
-    def __init__(self) -> None:
+    def __init__(self, fps: int) -> None:
         pygame.init()
         pygame.time.set_timer(ADDENEMY, ENEMY_ADD_TIMER)
+        self._fps = fps
         self._score_font = pygame.font.SysFont("comicsansms", 20)
         self._screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self._clock = pygame.time.Clock()
@@ -106,6 +122,7 @@ class Game:
         self.running = True
         self._player = Player()
         self._enemies = pygame.sprite.Group()
+        self._missiles = pygame.sprite.Group()
         self._all_sprites = pygame.sprite.Group()
         self._all_sprites.add(self._player)
         self.score = 0
@@ -126,14 +143,16 @@ class Game:
         self._check_event()
         self._player.update(a)
         self._enemies.update()
+        self._missiles.update()
 
         for enemy in self._enemies:
-            if enemy.rect.right < 0:
+            if pygame.sprite.collide_rect(enemy, self._player) or enemy.rect.right < 0:
                 self.running = False
 
-            if pygame.sprite.collide_rect(enemy, self._player):
+            if missile := pygame.sprite.spritecollideany(enemy, self._missiles):
                 self.score += 1
                 enemy.kill()
+                missile.kill()
 
         self.render()
 
@@ -146,7 +165,7 @@ class Game:
         self._render_score()
 
         pygame.display.flip()
-        self._clock.tick(FPS)
+        self._clock.tick(self._fps)
 
     def _check_event(self):
         for event in pygame.event.get():
@@ -160,6 +179,11 @@ class Game:
                 new_enemy = Enemy()
                 self._enemies.add(new_enemy)
                 self._all_sprites.add(new_enemy)
+
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                m = Missile(self._player.rect.centerx, self._player.rect.centery)
+                self._missiles.add(m)
+                self._all_sprites.add(m)
 
     def _render_score(self):
         value = self._score_font.render("Your Score: " + str(self.score), True, YELLOW)
