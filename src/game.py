@@ -1,3 +1,4 @@
+from enum import Enum, auto
 import random
 
 import pygame
@@ -30,7 +31,7 @@ class Player(pygame.sprite.Sprite):
         self.surf = pygame.Surface(PLAYER_SIZE)
         self.surf.fill((255, 255, 255))
         self.rect = self.surf.get_rect()
-    
+
     def update(self, pressed_keys):
         if pressed_keys[K_UP]:
             self.rect.move_ip(0, -5)
@@ -69,17 +70,19 @@ class Enemy(pygame.sprite.Sprite):
 
 class Game:
     def __init__(self) -> None:
+        pygame.init()
         self._screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-
         self._running = True
         self._player = Player()
         self._enemies = pygame.sprite.Group()
         self._all_sprites = pygame.sprite.Group()
         self._all_sprites.add(self._player)
         self._score = 0
+        self._clock = pygame.time.Clock()
+        self._score_font = pygame.font.SysFont("comicsansms", 20)
 
         pygame.time.set_timer(ADDENEMY, ENEMY_ADD_TIMER)
-        
+
     def run(self):
         while self._running:
             self._check_event()
@@ -88,23 +91,26 @@ class Game:
             self._player.update(pressed_keys)
             self._enemies.update()
 
-            self._screen.fill(BLACK)
-
-            for entity in self._all_sprites:
-                self._screen.blit(entity.surf, entity.rect)
-
             for enemy in self._enemies:
-                if enemy.rect.right < 0: 
+                if enemy.rect.right < 0:
                     self._running = False
 
                 if pygame.sprite.collide_rect(enemy, self._player):
                     self._score += 1
                     enemy.kill()
 
-            self._update_score()
-            pygame.display.flip()
+            self.render()
 
-            clock.tick(60)
+    def render(self):
+        self._screen.fill(BLACK)
+
+        for entity in self._all_sprites:
+            self._screen.blit(entity.surf, entity.rect)
+
+        self._render_score()
+
+        pygame.display.flip()
+        self._clock.tick(60)
 
     def _check_event(self):
         for event in pygame.event.get():
@@ -114,21 +120,28 @@ class Game:
 
             elif event.type == QUIT:
                 self._running = False
-            
+
             elif event.type == ADDENEMY:
                 new_enemy = Enemy()
                 self._enemies.add(new_enemy)
                 self._all_sprites.add(new_enemy)
 
-    def _update_score(self):
-        value = score_font.render("Your Score: " + str(self._score), True, YELLOW)
+    def _render_score(self):
+        value = self._score_font.render("Your Score: " + str(self._score), True, YELLOW)
         self._screen.blit(value, [0, 0])
 
-if __name__ == "__main__":
-    pygame.init()
-    score_font = pygame.font.SysFont("comicsansms", 20)
-    
-    clock = pygame.time.Clock()
-    
-    game = Game() 
-    game.run()
+class Action(Enum):
+    UP = auto()
+    DOWN = auto()
+
+class ShooterEnv:
+    def __init__(self, game: Game):
+        self._game = game
+        self._game.render()
+        self.state = self._scr_proc()
+
+    def _scr_proc():
+        return pygame.surfarray.array3d(pygame.display.get_surface())
+
+    def step(a: Action):
+        self._game.do(a)
