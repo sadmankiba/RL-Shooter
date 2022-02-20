@@ -1,5 +1,6 @@
 import random
 import inspect
+import logging
 from typing import Any, Iterable
 
 import pygame
@@ -48,6 +49,8 @@ STATE_IMG_W = 40
 T_STATE = NDArray[(STATE_IMG_H, STATE_IMG_W), int]
 T_Action = int
 
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger("model-logger")
 
 class Action:
     UP = 0
@@ -247,4 +250,6 @@ class ShooterEnv:
             self._n_steps = 0
 
         self.state = self._scr_proc()
+        log.debug(f"[ENV-STEP]: act {a}, s_nxt {self.state.tolist()}, rew {rew}, done {done}")
+        
         return self.state, rew, done

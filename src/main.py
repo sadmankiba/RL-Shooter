@@ -1,9 +1,9 @@
 from agent import Agent
 from game import Game, ShooterEnv
+from constants import TRAIN_FPS, PLAY_FPS
 
 TRAIN_ITER = 5000
-TRAIN_FPS = 500
-PLAY_FPS = 60
+
 
 if __name__ == "__main__":
     
