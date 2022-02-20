@@ -26,6 +26,8 @@ ENEMY_ADD_TIMER = 2000
 PLAYER_SIZE = (25, 75)
 ENEMY_SIZE = (25, 15)
 
+PLAYER_MOVE_STEP = 25
+
 BLACK = (0, 0, 0)
 YELLOW = (255, 255, 102)
 
@@ -62,9 +64,9 @@ class Player(pygame.sprite.Sprite):
 
     def update(self, a: T_Action) -> None:
         if a == Action.UP:
-            self.rect.move_ip(0, -5)
+            self.rect.move_ip(0, -PLAYER_MOVE_STEP)
         elif a == Action.DOWN:
-            self.rect.move_ip(0, 5)
+            self.rect.move_ip(0, PLAYER_MOVE_STEP)
 
         if self.rect.top <= SCORE_HEIGHT:
             self.rect.top = SCORE_HEIGHT
@@ -83,7 +85,7 @@ class Enemy(pygame.sprite.Sprite):
                 random.randint(SCORE_HEIGHT + 20, SCREEN_HEIGHT),
             )
         )
-        self.speed = random.random() * 2 + 0.5
+        self.speed = random.random() * 2 + 2.5
 
     def update(self):
         self.rect.move_ip(-self.speed, 0)
@@ -190,7 +192,7 @@ class ShooterEnv:
         if (not self._game.running) or self._n_steps >= self._MAX_STEPS:
             done = True
             self._game.start()
-            self._games_played += 1
+            self.games_played += 1
             self._n_steps = 0
 
         self.state = self._scr_proc()

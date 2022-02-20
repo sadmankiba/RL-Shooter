@@ -5,7 +5,7 @@ TRAIN_ITER = 5000
 
 if __name__ == "__main__":
     game = Game()
-    train = False
+    train = True
     if train:
         env = ShooterEnv(game)
         agent = Agent(env)
