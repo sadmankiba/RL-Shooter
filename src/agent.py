@@ -2,15 +2,16 @@ import random
 import collections
 
 import tensorflow as tf
-from tf.keras.models import Sequential
-from tf.keras.layers import Conv2D, MaxPool2D, Flatten, Dense
-from tf.keras.losses import Huber
-from tf.keras.optimizers import Adam
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dense
+from tensorflow.keras.losses import Huber
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.utils import to_categorical
 import numpy as np
 from nptyping import NDArray
 
 from constants import UP, DOWN
-from game import ShooterEnv, T_STATE, T_Action
+from game import ShooterEnv, T_STATE, T_Action, STATE_IMG_H, STATE_IMG_W
 
 EPSILON_INIT = 1.0
 EPSILON_DEC_SCALE = 0.99
@@ -54,27 +55,38 @@ class Agent:
     def __init__(self, env: ShooterEnv):
         self._env = env
         self._model = self._convmodel()
-        self._tartget_model = self._convmodel()
+        self._target_model = self._convmodel()
         self._rep = ReplayBuffer(REPLAY_BUFFER_SIZE)
         self._epsilon = EPSILON_INIT
         self.GAMMA = 0.99
+        self._model.summary()
 
-    def _convmodel(lr: float = 0.001):
+    def _convmodel(self, lr: float = 0.001):
         m = Sequential()
         m.add(
             Conv2D(
                 5,
                 (6, 6),
+                strides=2,
+                padding="same",
                 activation="relu",
                 kernel_initializer="he_uniform",
-                input_shape=(38, 38, 1),
+                input_shape=(STATE_IMG_H, STATE_IMG_W, 1),
             )
         )
         m.add(MaxPool2D((2, 2), strides=2))
-        m.add(Conv2D(10, (4, 4), activation="relu", kernel_initializer="he_uniform"))
+        m.add(
+            Conv2D(
+                10,
+                (5, 5),
+                activation="relu",
+                padding="same",
+                kernel_initializer="he_uniform",
+            )
+        )
         m.add(MaxPool2D((2, 2)))
         m.add(Flatten())
-        m.add(Dense(2, activation=None))
+        m.add(Dense(len(self._env.actions), activation=None))
         m.compile(Adam(lr), loss=tf.keras.losses.Huber())
         return m
 
@@ -90,13 +102,17 @@ class Agent:
             v_nxt_batch = np.max(q_nxt_batch, axis=1)
             q_ref_batch = batch["rew"] + self.GAMMA * v_nxt_batch * (1 - batch["done"])
 
-            total_loss += loss
+            inp_batch = self._prep_state_img(batch["s"])
+            a_batch = batch["a"]
             with tf.GradientTape() as tape:
-                q_current = np.squeeze(
-                    self._model.predict(self._prep_state_img(batch["s"]))
-                )[:, batch["actions"]]
-                assert q_ref_batch.shape == q_current.shape
-                loss = Huber()(q_ref_batch, q_current)
+                q_current = self._model(inp_batch)
+                one_hot_actions = to_categorical(
+                    a_batch, len(self._env.actions), dtype=np.float32
+                )
+                q_a = tf.reduce_sum(tf.multiply(q_current, one_hot_actions), axis=1)
+                loss = Huber()(q_ref_batch, q_a)
+
+            total_loss += loss
 
             model_gradients = tape.gradient(loss, self._model.trainable_variables)
             self._model.optimizer.apply_gradients(
@@ -112,6 +128,10 @@ class Agent:
             if i != 0 and i % ITER_UPDATE_HISTORY == 0:
                 history["mean_rew"].append(self._evaluate(5))
                 history["mean_loss"].append(total_loss / ITER_UPDATE_HISTORY)
+                print(
+                    f"iter: {i}/{n}, games played: {self._env.games_played}"
+                    f", mean reward: {history['mean_rew'][-1]}, loss: {history['mean_loss'][-1]}"
+                )
                 total_loss = 0
 
         return history
@@ -127,11 +147,13 @@ class Agent:
     def _choose_action(self, s: T_STATE) -> T_Action:
         ba = self._choose_best_action(s)
         ra = random.choice(self._env.actions)
-        return random.choices([ba, ra], weights=[1 - self._epsilon, self._epsilon], k=1)[0]
+        return random.choices(
+            [ba, ra], weights=[1 - self._epsilon, self._epsilon], k=1
+        )[0]
 
     def _choose_best_action(self, s: T_STATE) -> T_Action:
-        q = self._model.predict(self._prep_state_img(s))
-        return np.argmax(q.flatten())
+        q = self._model.predict(self._prep_state_img(s))[0]
+        return np.argmax(q)
 
     def _evaluate(self, n_eps: int) -> float:
         env = self._env.copy()
@@ -150,6 +172,9 @@ class Agent:
 
         return sum(rew_all) / n_eps
 
-    def _prep_state_img(s: NDArray) -> NDArray:
+    def _prep_state_img(self, s: NDArray) -> NDArray:
         s = s[..., np.newaxis]
+        if len(s.shape) == 3:
+            s = s[np.newaxis, ...]
+
         return s / 255

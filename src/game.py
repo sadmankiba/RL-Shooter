@@ -18,22 +18,23 @@ from nptyping import NDArray
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 SCORE_HEIGHT = 80
-FPS = 60
+FPS = 500
 ADDENEMY = pygame.USEREVENT + 1
 
 ENEMY_ADD_TIMER = 2000
 
 PLAYER_SIZE = (25, 75)
-ENEMY_SIZE = (20, 10)
+ENEMY_SIZE = (25, 15)
 
 BLACK = (0, 0, 0)
 YELLOW = (255, 255, 102)
 
-STATE_IMG_H = 38
-STATE_IMG_W = 38
+STATE_IMG_H = 40
+STATE_IMG_W = 40
 
 T_STATE = NDArray[(STATE_IMG_H, STATE_IMG_W), int]
 T_Action = int
+
 
 class Action:
     UP = 0
@@ -43,6 +44,7 @@ class Action:
     def __len__(self):
         return 3
 
+
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super(Player, self).__init__()
@@ -50,8 +52,11 @@ class Player(pygame.sprite.Sprite):
         self.surf.fill((255, 255, 255))
         self.rect = self.surf.get_rect(
             center=(
-                int(PLAYER_SIZE[0] / 1.8), 
-                random.randint(SCORE_HEIGHT + PLAYER_SIZE[1] / 2, SCREEN_HEIGHT - PLAYER_SIZE[1] / 2)
+                int(PLAYER_SIZE[0] / 1.8),
+                random.randint(
+                    int(SCORE_HEIGHT + PLAYER_SIZE[1] / 2),
+                    int(SCREEN_HEIGHT - PLAYER_SIZE[1] / 2),
+                ),
             )
         )
 
@@ -66,6 +71,7 @@ class Player(pygame.sprite.Sprite):
         if self.rect.bottom >= SCREEN_HEIGHT:
             self.rect.bottom = SCREEN_HEIGHT
 
+
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
         super(Enemy, self).__init__()
@@ -77,7 +83,7 @@ class Enemy(pygame.sprite.Sprite):
                 random.randint(SCORE_HEIGHT + 20, SCREEN_HEIGHT),
             )
         )
-        self.speed = random.random() + 0.5
+        self.speed = random.random() * 2 + 0.5
 
     def update(self):
         self.rect.move_ip(-self.speed, 0)
@@ -164,10 +170,13 @@ class ShooterEnv:
         self.actions: Iterable[T_Action] = range(len(Action()))
         self._MAX_STEPS = 100000
         self._n_steps = 0
+        self.games_played = 0
 
     def _scr_proc(self) -> T_STATE:
         scr = pygame.surfarray.array3d(pygame.display.get_surface())
-        scr = cv2.cvtColor(cv2.resize(scr, (STATE_IMG_H, STATE_IMG_W)), cv2.COLOR_BGR2GRAY)
+        scr = cv2.cvtColor(
+            cv2.resize(scr, (STATE_IMG_H, STATE_IMG_W)), cv2.COLOR_BGR2GRAY
+        )
         _, scr = cv2.threshold(scr, 1, 255, cv2.THRESH_BINARY)
         return np.array(scr)
 
@@ -181,6 +190,7 @@ class ShooterEnv:
         if (not self._game.running) or self._n_steps >= self._MAX_STEPS:
             done = True
             self._game.start()
+            self._games_played += 1
             self._n_steps = 0
 
         self.state = self._scr_proc()
