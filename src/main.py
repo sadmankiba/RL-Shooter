@@ -1,5 +1,3 @@
-import pygame
-
 from agent import Agent
 from game import Game
 
@@ -13,5 +11,4 @@ if __name__ == "__main__":
         history = agent.train()
         print(history)
     else:
-
         game.run()

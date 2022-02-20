@@ -1,6 +1,5 @@
-from enum import Enum, auto
 import random
-from typing import Any
+from typing import Any, Iterable
 
 import pygame
 from pygame.locals import (
@@ -12,10 +11,13 @@ from pygame.locals import (
     KEYDOWN,
     QUIT,
 )
+import cv2
+from nptyping import NDArray
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 SCORE_HEIGHT = 80
+FPS = 60
 ADDENEMY = pygame.USEREVENT + 1
 
 ENEMY_ADD_TIMER = 2000
@@ -26,10 +28,16 @@ ENEMY_SIZE = (20, 10)
 BLACK = (0, 0, 0)
 YELLOW = (255, 255, 102)
 
-class Action(Enum):
-    UP = auto()
-    DOWN = auto()
-    NOP = auto()
+STATE_IMG_H = 38
+STATE_IMG_W = 38
+
+T_STATE = NDArray[(STATE_IMG_H, STATE_IMG_W), int]
+T_Action = int
+
+class Action:
+    UP = 0
+    DOWN = 1
+    NOP = 2
 
 class Player(pygame.sprite.Sprite):
     def __init__(self):
@@ -38,7 +46,7 @@ class Player(pygame.sprite.Sprite):
         self.surf.fill((255, 255, 255))
         self.rect = self.surf.get_rect()
 
-    def update(self, a: Action) -> None:
+    def update(self, a: T_Action) -> None:
         if a == Action.UP:
             self.rect.move_ip(0, -5)
         elif a == Action.DOWN:
@@ -72,6 +80,7 @@ class Game:
         pygame.time.set_timer(ADDENEMY, ENEMY_ADD_TIMER)
         self._score_font = pygame.font.SysFont("comicsansms", 20)
         self._screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self._clock = pygame.time.Clock()
         self.start()
 
     def start(self):
@@ -81,7 +90,6 @@ class Game:
         self._all_sprites = pygame.sprite.Group()
         self._all_sprites.add(self._player)
         self.score = 0
-        self._clock = pygame.time.Clock()
 
     def run(self):
         while self.running:
@@ -95,7 +103,7 @@ class Game:
 
             self.step(a)
 
-    def step(a: Action):
+    def step(a: T_Action):
         self._check_event()
         self._player.update(a)
         self._enemies.update()
@@ -119,7 +127,7 @@ class Game:
         self._render_score()
 
         pygame.display.flip()
-        self._clock.tick(60)
+        self._clock.tick(FPS)
 
     def _check_event(self):
         for event in pygame.event.get():
@@ -144,20 +152,27 @@ class ShooterEnv:
         self._game = game
         self._game.render()
         self.state = self._scr_proc()
+        self.actions: Iterable[T_Action] = range(len(Action))
+        self._MAX_STEPS = 100000
+        self._n_steps = 0
 
-    def _scr_proc():
-        return pygame.surfarray.array3d(pygame.display.get_surface())
+    def _scr_proc() -> T_STATE:
+        scr = pygame.surfarray.array3d(pygame.display.get_surface())
+        scr = cv2.cvtColor(cv2.resize(scr, (STATE_IMG_H, STATE_IMG_W)), cv2.COLOR_BGR2GRAY)
+        scr = cv2.threshold(scr, 1, 255, cv2.THRESH_BINARY)
+        return np.array(scr)
 
-    def step(a: Action) -> tuple[Any, int, bool]:
+    def step(a: T_Action) -> tuple[Any, int, bool]:
         prev_scr = self._game.score
         self._game.step(a)
-
         rew = self._game.score - prev_scr
+        self._n_steps += 1
+
         done = False
-        if not self._game.running:
+        if (not self._game.running) or self._n_steps >= self._MAX_STEPS:
             done = True
             self._game.start()
+            self._n_steps = 0
 
         self.state = self._scr_proc()
-        
         return self.state, rew, done
