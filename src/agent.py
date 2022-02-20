@@ -1,7 +1,9 @@
 import random
 
+import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv2D, MaxPool2D
+from tensorflow.keras.losses import Huber
 from nptyping import NDArray
 
 from constants import UP, DOWN
@@ -74,12 +76,15 @@ class Agent:
             q_nxt_batch = np.squeeze(self._target_model.predict(self._prep_state_img(batch["s_nxt"])))
             v_nxt_batch = np.max(q_nxt_batch, axis=1)
             q_ref_batch = batch["rew"] + self.GAMMA * v_nxt_batch * (1 - batch["done"])
-            q_current = np.squeeze(self._model.predict(self._prep_state_img(batch["s"])))[:, batch["actions"]]
-            assert q_ref_batch.shape == q_current.shape
 
-            loss = 1 / len(batch.s) * np.sum(q_ref_batch - q_current)**2
             total_loss += loss
-            self._model.update(loss)
+            with tf.GradientTape() as tape:
+                q_current = np.squeeze(self._model.predict(self._prep_state_img(batch["s"])))[:, batch["actions"]]
+                assert q_ref_batch.shape == q_current.shape
+                loss = Huber()(q_ref_batch, q_current)
+
+            model_gradients = tape.gradient(loss, self._model.trainable_variables)
+            self._model.optimizer.apply_gradients(zip(model_gradients, self._model.trainable_variables))
 
             if i % ITER_UPDATE_TARGET_MODEL == 0:
                 self._target_model.set_weights(self._model.get_weights())

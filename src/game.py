@@ -165,7 +165,7 @@ class ShooterEnv:
     def step(a: T_Action) -> tuple[Any, int, bool]:
         prev_scr = self._game.score
         self._game.step(a)
-        rew = self._game.score - prev_scr
+        rew = (self._game.score - prev_scr) / 10
         self._n_steps += 1
 
         done = False
