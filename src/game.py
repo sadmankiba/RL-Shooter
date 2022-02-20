@@ -1,4 +1,5 @@
 import random
+import inspect
 from typing import Any, Iterable
 
 import pygame
@@ -17,6 +18,8 @@ import numpy as np
 import cv2
 from nptyping import NDArray
 
+from util import parent_dir
+
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 SCORE_HEIGHT = 80
@@ -25,8 +28,11 @@ ADDENEMY = pygame.USEREVENT + 1
 ENEMY_ADD_TIMER = 2000
 
 PLAYER_SIZE = (25, 75)
+PLAYER_IMG_SIZE = (75, 75)
 ENEMY_SIZE = (25, 50)
+ENEMY_IMG_SIZE = (60, 60)
 MISSILE_SIZE = (10, 5)
+MISSILE_IMG_SIZE = (24, 24)
 
 PLAYER_MOVE_STEP = 20
 ENEMY_SPEED = 5
@@ -55,8 +61,14 @@ class Action:
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super(Player, self).__init__()
-        self.surf = pygame.Surface(PLAYER_SIZE)
-        self.surf.fill(WHITE)
+        use_img = True
+        if use_img:
+            self.surf = pygame.image.load(
+                f"{parent_dir(inspect.currentframe()).parent}/assets/spaceship.png"
+            ).convert()
+        else:
+            self.surf = pygame.Surface(PLAYER_SIZE)
+            self.surf.fill(WHITE)
         self.rect = self.surf.get_rect(
             center=(
                 int(PLAYER_SIZE[0] / 1.7),
@@ -82,8 +94,14 @@ class Player(pygame.sprite.Sprite):
 class Missile(pygame.sprite.Sprite):
     def __init__(self, x: int, y: int):
         super(Missile, self).__init__()
-        self.surf = pygame.Surface(MISSILE_SIZE)
-        self.surf.fill(WHITE)
+        use_img = True
+        if use_img:
+            self.surf = pygame.image.load(
+                f"{parent_dir(inspect.currentframe()).parent}/assets/missile.png"
+            ).convert()
+        else:
+            self.surf = pygame.Surface(MISSILE_SIZE)
+            self.surf.fill(WHITE)
         self.rect = self.surf.get_rect(center=(x, y))
         self.speed = MISSILE_SPEED
 
@@ -94,8 +112,15 @@ class Missile(pygame.sprite.Sprite):
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
         super(Enemy, self).__init__()
-        self.surf = pygame.Surface(ENEMY_SIZE)
-        self.surf.fill(WHITE)
+        use_img = True
+        if use_img:
+            self.surf = pygame.image.load(
+                f"{parent_dir(inspect.currentframe()).parent}/assets/plane.png"
+            ).convert()
+        else:
+            self.surf = pygame.Surface(ENEMY_SIZE)
+            self.surf.fill(WHITE)
+        
         self.rect = self.surf.get_rect(
             center=(
                 random.randint(SCREEN_WIDTH + 20, SCREEN_WIDTH + 100),
