@@ -73,6 +73,8 @@ class Player(pygame.sprite.Sprite):
         if self.rect.bottom >= SCREEN_HEIGHT:
             self.rect.bottom = SCREEN_HEIGHT
 
+class Missile(pygame.sprite.Sprite):
+    pass
 
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
