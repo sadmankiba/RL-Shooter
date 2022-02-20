@@ -1,5 +1,6 @@
 from enum import Enum, auto
 import random
+from typing import Any
 
 import pygame
 from pygame.locals import (
@@ -25,6 +26,11 @@ ENEMY_SIZE = (20, 10)
 BLACK = (0, 0, 0)
 YELLOW = (255, 255, 102)
 
+class Action(Enum):
+    UP = auto()
+    DOWN = auto()
+    NOP = auto()
+
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super(Player, self).__init__()
@@ -32,20 +38,12 @@ class Player(pygame.sprite.Sprite):
         self.surf.fill((255, 255, 255))
         self.rect = self.surf.get_rect()
 
-    def update(self, pressed_keys):
-        if pressed_keys[K_UP]:
+    def update(self, a: Action) -> None:
+        if a == Action.UP:
             self.rect.move_ip(0, -5)
-        if pressed_keys[K_DOWN]:
+        elif a == Action.DOWN:
             self.rect.move_ip(0, 5)
-        if pressed_keys[K_LEFT]:
-            self.rect.move_ip(-5, 0)
-        if pressed_keys[K_RIGHT]:
-            self.rect.move_ip(5, 0)
 
-        if self.rect.left < 0:
-            self.rect.left = 0
-        if self.rect.right > SCREEN_WIDTH:
-            self.rect.right = SCREEN_WIDTH
         if self.rect.top <= SCORE_HEIGHT:
             self.rect.top = SCORE_HEIGHT
         if self.rect.bottom >= SCREEN_HEIGHT:
@@ -71,35 +69,46 @@ class Enemy(pygame.sprite.Sprite):
 class Game:
     def __init__(self) -> None:
         pygame.init()
+        pygame.time.set_timer(ADDENEMY, ENEMY_ADD_TIMER)
+        self._score_font = pygame.font.SysFont("comicsansms", 20)
         self._screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        self._running = True
+        self.start()
+
+    def start(self):
+        self.running = True
         self._player = Player()
         self._enemies = pygame.sprite.Group()
         self._all_sprites = pygame.sprite.Group()
         self._all_sprites.add(self._player)
-        self._score = 0
+        self.score = 0
         self._clock = pygame.time.Clock()
-        self._score_font = pygame.font.SysFont("comicsansms", 20)
-
-        pygame.time.set_timer(ADDENEMY, ENEMY_ADD_TIMER)
 
     def run(self):
-        while self._running:
-            self._check_event()
+        while self.running:
             pressed_keys = pygame.key.get_pressed()
+            if pressed_keys[K_UP]:
+                a = Action.UP
+            elif pressed_keys[K_DOWN]:
+                a = Action.DOWN
+            else:
+                a = Action.NOP
 
-            self._player.update(pressed_keys)
-            self._enemies.update()
+            self.step(a)
 
-            for enemy in self._enemies:
-                if enemy.rect.right < 0:
-                    self._running = False
+    def step(a: Action):
+        self._check_event()
+        self._player.update(a)
+        self._enemies.update()
 
-                if pygame.sprite.collide_rect(enemy, self._player):
-                    self._score += 1
-                    enemy.kill()
+        for enemy in self._enemies:
+            if enemy.rect.right < 0:
+                self.running = False
 
-            self.render()
+            if pygame.sprite.collide_rect(enemy, self._player):
+                self.score += 1
+                enemy.kill()
+
+        self.render()
 
     def render(self):
         self._screen.fill(BLACK)
@@ -114,12 +123,11 @@ class Game:
 
     def _check_event(self):
         for event in pygame.event.get():
-            if event.type == KEYDOWN:
-                if event.key == K_ESCAPE:
-                    self._running = False
+            if event.key == K_ESCAPE and event.type == KEYDOWN:
+                self.running = False
 
             elif event.type == QUIT:
-                self._running = False
+                self.running = False
 
             elif event.type == ADDENEMY:
                 new_enemy = Enemy()
@@ -127,12 +135,9 @@ class Game:
                 self._all_sprites.add(new_enemy)
 
     def _render_score(self):
-        value = self._score_font.render("Your Score: " + str(self._score), True, YELLOW)
+        value = self._score_font.render("Your Score: " + str(self.score), True, YELLOW)
         self._screen.blit(value, [0, 0])
 
-class Action(Enum):
-    UP = auto()
-    DOWN = auto()
 
 class ShooterEnv:
     def __init__(self, game: Game):
@@ -143,5 +148,17 @@ class ShooterEnv:
     def _scr_proc():
         return pygame.surfarray.array3d(pygame.display.get_surface())
 
-    def step(a: Action):
-        self._game.do(a)
+    def step(a: Action) -> tuple[Any, int, bool]:
+        prev_scr = self._game.score
+        self._game.step(a)
+
+        rew = self._game.score - prev_scr
+        self.state = self._scr_proc()
+
+        done = False
+
+        if not self._game.running:
+            done = True
+            self._game.start()
+
+        return self.state, rew, done
