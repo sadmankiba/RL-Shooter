@@ -23,7 +23,7 @@ ADDENEMY = pygame.USEREVENT + 1
 
 ENEMY_ADD_TIMER = 2000
 
-PLAYER_SIZE = (75, 25)
+PLAYER_SIZE = (25, 75)
 ENEMY_SIZE = (20, 10)
 
 BLACK = (0, 0, 0)
@@ -40,12 +40,20 @@ class Action:
     DOWN = 1
     NOP = 2
 
+    def __len__(self):
+        return 3
+
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super(Player, self).__init__()
         self.surf = pygame.Surface(PLAYER_SIZE)
         self.surf.fill((255, 255, 255))
-        self.rect = self.surf.get_rect()
+        self.rect = self.surf.get_rect(
+            center=(
+                int(PLAYER_SIZE[0] / 1.8), 
+                random.randint(SCORE_HEIGHT + PLAYER_SIZE[1] / 2, SCREEN_HEIGHT - PLAYER_SIZE[1] / 2)
+            )
+        )
 
     def update(self, a: T_Action) -> None:
         if a == Action.UP:
@@ -132,7 +140,7 @@ class Game:
 
     def _check_event(self):
         for event in pygame.event.get():
-            if event.key == K_ESCAPE and event.type == KEYDOWN:
+            if event.type == KEYDOWN and event.key == K_ESCAPE:
                 self.running = False
 
             elif event.type == QUIT:
@@ -153,14 +161,14 @@ class ShooterEnv:
         self._game = game
         self._game.render()
         self.state = self._scr_proc()
-        self.actions: Iterable[T_Action] = range(len(Action))
+        self.actions: Iterable[T_Action] = range(len(Action()))
         self._MAX_STEPS = 100000
         self._n_steps = 0
 
-    def _scr_proc() -> T_STATE:
+    def _scr_proc(self) -> T_STATE:
         scr = pygame.surfarray.array3d(pygame.display.get_surface())
         scr = cv2.cvtColor(cv2.resize(scr, (STATE_IMG_H, STATE_IMG_W)), cv2.COLOR_BGR2GRAY)
-        scr = cv2.threshold(scr, 1, 255, cv2.THRESH_BINARY)
+        _, scr = cv2.threshold(scr, 1, 255, cv2.THRESH_BINARY)
         return np.array(scr)
 
     def step(self, a: T_Action) -> tuple[Any, int, bool]:

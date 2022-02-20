@@ -144,6 +144,7 @@ class Agent:
                 a = self._choose_best_action(s)
                 s_nxt, rew, done = self._env.step(a)
                 rew_eps += rew
+                s = s_nxt
 
             rew_all.append(rew_eps)
 
