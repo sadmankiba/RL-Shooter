@@ -13,7 +13,7 @@ from pygame.locals import (
     KEYDOWN,
     QUIT,
     K_SPACE,
-    MOUSEBUTTONDOWN,
+    K_s
 )
 import numpy as np
 import cv2
@@ -26,22 +26,21 @@ SCREEN_HEIGHT = 600
 SCORE_HEIGHT = 80
 ADDENEMY = pygame.USEREVENT + 1
 
-ENEMY_ADD_TIMER = 2000
-
 PLAYER_SIZE = (25, 75)
 PLAYER_IMG_SIZE = (75, 75)
 ENEMY_SIZE = (25, 50)
-ENEMY_IMG_SIZE = (90, 90)
-MISSILE_SIZE = (3, 1)
+ENEMY_IMG_SIZE = (75, 75)
+MISSILE_SIZE = (8, 5)
 MISSILE_IMG_SIZE = (24, 24)
 
 PLAYER_MOVE_STEP = 20
-ENEMY_SPEED = 5
-MISSILE_SPEED = 15
+ENEMY_SPEED = 3
+MISSILE_SPEED = 25
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 YELLOW = (255, 255, 102)
+GRAY = (40, 40, 50)
 
 STATE_IMG_H = 40
 STATE_IMG_W = 40
@@ -109,14 +108,14 @@ class Player(pygame.sprite.Sprite):
 class Missile(pygame.sprite.Sprite):
     def __init__(self, x: int, y: int):
         super(Missile, self).__init__()
-        use_img = True
+        use_img = False
         if use_img:
             self.surf = pygame.image.load(
                 f"{parent_dir(inspect.currentframe()).parent}/assets/missile.png"
             ).convert_alpha()
         else:
             self.surf = pygame.Surface(MISSILE_SIZE)
-            self.surf.fill(WHITE)
+            self.surf.fill(GRAY)
         self.rect = self.surf.get_rect(center=(x, y))
         self.speed = MISSILE_SPEED
 
@@ -130,8 +129,8 @@ class Enemy(pygame.sprite.Sprite):
         use_img = True
         if use_img:
             self.surf = pygame.image.load(
-                f"{parent_dir(inspect.currentframe()).parent}/assets/plane.png"
-            ).convert()
+                f"{parent_dir(inspect.currentframe()).parent}/assets/spaceship_left.png"
+            ).convert_alpha()
         else:
             self.surf = pygame.Surface(ENEMY_SIZE)
             self.surf.fill(WHITE)
@@ -151,8 +150,8 @@ class Enemy(pygame.sprite.Sprite):
 class Game:
     def __init__(self, fps: int, display: bool) -> None:
         pygame.init()
-        pygame.time.set_timer(ADDENEMY, ENEMY_ADD_TIMER)
         self._fps = fps
+        pygame.time.set_timer(ADDENEMY, fps * 20)
         self._display = display
         self._score_font = pygame.font.SysFont("comicsansms", 20)
         self._screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -171,12 +170,12 @@ class Game:
     def run(self):
         while self.running:
             pressed_keys = pygame.key.get_pressed()
-            if self._check_click():
-                a = Action.SHOOT
-            elif pressed_keys[K_UP]:
+            if pressed_keys[K_UP]:
                 a = Action.UP
             elif pressed_keys[K_DOWN]:
                 a = Action.DOWN
+            elif pressed_keys[K_s]:
+                a = Action.SHOOT
             else:
                 a = Action.NOP
 
@@ -184,7 +183,6 @@ class Game:
 
     def step(self, a: T_Action):
         self._check_event()
-
         if a == Action.SHOOT:
             m = Missile(self._player.rect.centerx, self._player.rect.centery)
             self._missiles.add(m)
@@ -261,7 +259,7 @@ class ShooterEnv:
         scr = cv2.cvtColor(
             cv2.resize(scr, (STATE_IMG_H, STATE_IMG_W)), cv2.COLOR_BGR2GRAY
         )
-        # _, scr = cv2.threshold(scr, 50, 255, cv2.THRESH_BINARY)
+        _, scr = cv2.threshold(scr, 100, 255, cv2.THRESH_BINARY)
         return np.array(scr)
 
     def step(self, a: T_Action) -> tuple[Any, int, bool]:

@@ -7,7 +7,7 @@ TRAIN_ITER = 5000
 
 
 if __name__ == "__main__":
-    train = False
+    train = True
     if train:
         game = Game(TRAIN_FPS, False)
         env = ShooterEnv(game)
