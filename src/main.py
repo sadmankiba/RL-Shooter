@@ -1,6 +1,7 @@
 from agent import Agent
-from game import Game
+from game import Game, ShooterEnv
 
+TRAIN_ITER = 5000
 
 if __name__ == "__main__":
     game = Game()
@@ -8,7 +9,7 @@ if __name__ == "__main__":
     if train:
         env = ShooterEnv(game)
         agent = Agent(env)
-        history = agent.train()
+        history = agent.train(TRAIN_ITER)
         print(history)
     else:
         game.run()

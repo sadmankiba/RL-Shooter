@@ -11,6 +11,7 @@ from pygame.locals import (
     KEYDOWN,
     QUIT,
 )
+import numpy as np
 import cv2
 from nptyping import NDArray
 
@@ -103,7 +104,7 @@ class Game:
 
             self.step(a)
 
-    def step(a: T_Action):
+    def step(self, a: T_Action):
         self._check_event()
         self._player.update(a)
         self._enemies.update()
@@ -162,7 +163,7 @@ class ShooterEnv:
         scr = cv2.threshold(scr, 1, 255, cv2.THRESH_BINARY)
         return np.array(scr)
 
-    def step(a: T_Action) -> tuple[Any, int, bool]:
+    def step(self, a: T_Action) -> tuple[Any, int, bool]:
         prev_scr = self._game.score
         self._game.step(a)
         rew = (self._game.score - prev_scr) / 10
