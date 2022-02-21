@@ -13,7 +13,7 @@ from pygame.locals import (
     KEYDOWN,
     QUIT,
     K_SPACE,
-    K_s
+    K_s,
 )
 import numpy as np
 import cv2
@@ -21,21 +21,22 @@ from nptyping import NDArray
 
 from util import parent_dir
 
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
-SCORE_HEIGHT = 80
+SCREEN_WIDTH = 640
+SCREEN_HEIGHT = 680
+SCORE_HEIGHT = 40
 ADDENEMY = pygame.USEREVENT + 1
 
 PLAYER_SIZE = (25, 75)
-PLAYER_IMG_SIZE = (75, 75)
+PLAYER_IMG_SIZE = (64, 64)
 ENEMY_SIZE = (25, 50)
-ENEMY_IMG_SIZE = (75, 75)
-MISSILE_SIZE = (8, 5)
+ENEMY_IMG_SIZE = (64, 64)
+MISSILE_SIZE = (8, 4)
 MISSILE_IMG_SIZE = (24, 24)
 
 PLAYER_MOVE_STEP = 20
-ENEMY_SPEED = 3
-MISSILE_SPEED = 25
+ENEMY_SPEED = 6
+MISSILE_SPEED = 30
+ENEMY_ADD_TIMER = int(SCREEN_WIDTH / ENEMY_SPEED / 2.2)
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -51,6 +52,7 @@ T_Action = int
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("model-logger")
 
+
 class Action:
     UP = 0
     DOWN = 1
@@ -59,16 +61,16 @@ class Action:
 
     def __len__(self):
         return 4
-    
+
     @classmethod
     def rev(self, a: int):
-        if a == 0: 
+        if a == 0:
             return "up"
-        elif a == 1: 
+        elif a == 1:
             return "down"
-        elif a == 2: 
+        elif a == 2:
             return "nop"
-        elif a == 3: 
+        elif a == 3:
             return "shoot"
 
 
@@ -121,6 +123,8 @@ class Missile(pygame.sprite.Sprite):
 
     def update(self):
         self.rect.move_ip(self.speed, 0)
+        if self.rect.left > SCREEN_WIDTH:
+            self.kill()
 
 
 class Enemy(pygame.sprite.Sprite):
@@ -134,10 +138,10 @@ class Enemy(pygame.sprite.Sprite):
         else:
             self.surf = pygame.Surface(ENEMY_SIZE)
             self.surf.fill(WHITE)
-        
+
         self.rect = self.surf.get_rect(
             center=(
-                random.randint(SCREEN_WIDTH + 20, SCREEN_WIDTH + 100),
+                random.randint(SCREEN_WIDTH + 20, SCREEN_WIDTH + 40),
                 random.randint(SCORE_HEIGHT + 40, SCREEN_HEIGHT - 40),
             )
         )
@@ -148,14 +152,25 @@ class Enemy(pygame.sprite.Sprite):
 
 
 class Game:
-    def __init__(self, fps: int, display: bool) -> None:
+    def __init__(self, fps: int, display: bool, sound: bool) -> None:
         pygame.init()
         self._fps = fps
-        pygame.time.set_timer(ADDENEMY, fps * 20)
+        # pygame.time.set_timer(ADDENEMY, fps * 20)
         self._display = display
-        self._score_font = pygame.font.SysFont("comicsansms", 20)
+        self._sound = sound
+        self._score_font = pygame.font.SysFont("comicsansms", 30)
         self._screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self._clock = pygame.time.Clock()
+        self._time_to_add_enemy = ENEMY_ADD_TIMER
+        self._fire_sound = pygame.mixer.Sound(
+            f"{parent_dir(inspect.currentframe()).parent}/assets/fire.mp3"
+        )
+        self._crash_sound = pygame.mixer.Sound(
+            f"{parent_dir(inspect.currentframe()).parent}/assets/crash.ogg"
+        )
+        self._game_over_sound = pygame.mixer.Sound(
+            f"{parent_dir(inspect.currentframe()).parent}/assets/game_over.mp3"
+        ) 
         self.start()
 
     def start(self):
@@ -187,18 +202,30 @@ class Game:
             m = Missile(self._player.rect.centerx, self._player.rect.centery)
             self._missiles.add(m)
             self._all_sprites.add(m)
+            if self._sound:
+                self._fire_sound.play()
+
         elif a == Action.UP or a == Action.DOWN:
             self._player.update(a)
-        
+
+        self._time_to_add_enemy -= 1
+        if self._time_to_add_enemy <= 0:
+            self._add_enemy()
+            self._time_to_add_enemy = ENEMY_ADD_TIMER
+
         self._enemies.update()
         self._missiles.update()
 
         for enemy in self._enemies:
             if pygame.sprite.collide_rect(enemy, self._player) or enemy.rect.right < 0:
                 self.running = False
+                if self._sound:
+                    self._game_over_sound.play()
 
             if missile := pygame.sprite.spritecollideany(enemy, self._missiles):
                 self.score += 1
+                if self._sound:
+                    self._crash_sound.play()
                 enemy.kill()
                 missile.kill()
 
@@ -214,7 +241,7 @@ class Game:
 
         if self._display:
             pygame.display.flip()
-        
+
         self._clock.tick(self._fps)
 
     def _check_event(self):
@@ -226,16 +253,19 @@ class Game:
                 self.running = False
 
             elif event.type == ADDENEMY:
-                new_enemy = Enemy()
-                self._enemies.add(new_enemy)
-                self._all_sprites.add(new_enemy)
+                self._add_enemy()
 
     def _check_click(self):
         for event in pygame.event.get():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 return True
-        
+
         return False
+
+    def _add_enemy(self):
+        new_enemy = Enemy()
+        self._enemies.add(new_enemy)
+        self._all_sprites.add(new_enemy)
 
     def _render_score(self):
         value = self._score_font.render("Your Score: " + str(self.score), True, YELLOW)
@@ -265,18 +295,19 @@ class ShooterEnv:
     def step(self, a: T_Action) -> tuple[Any, int, bool]:
         prev_scr = self._game.score
         self._game.step(a)
-        rew = (self._game.score - prev_scr) / 10
+        rew = 0.05
+        rew += (self._game.score - prev_scr) / 2
         self._n_steps += 1
 
         done = False
         if (not self._game.running) or self._n_steps >= self._MAX_STEPS:
             done = True
-            rew += -0.5
+            rew += -1
             self._game.start()
             self.games_played += 1
             self._n_steps = 0
 
         self.state = self._scr_proc()
         # log.debug(f"[ENV-STEP]: act {a}, s_nxt {self.state.tolist()}, rew {rew}, done {done}")
-        
+
         return self.state, rew, done

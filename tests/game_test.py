@@ -5,7 +5,7 @@ from game import Game, Action, ShooterEnv
 class TestGame:
     def test_run(self, game: Game):
         for _ in range(100):
-            a = random.choice([Action.UP, Action.DOWN, Action.NOP])
+            a = random.choice([Action.UP, Action.DOWN, Action.NOP, Action.SHOOT])
             game.step(a)
             if not game.running:
                 game.start()

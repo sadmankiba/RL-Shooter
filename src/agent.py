@@ -18,14 +18,15 @@ from util import FileSave, parent_dir
 
 EPSILON_INIT = 1.0
 EPSILON_DEC_SCALE = 0.99
-PLAY_STEPS = 10
-REPLAY_SAMPLE_TRAIN_SIZE = 64
-ITER_UPDATE_TARGET_MODEL = 50
+PLAY_STEPS = 32
+REPLAY_SAMPLE_TRAIN_SIZE = 32
+ITER_UPDATE_TARGET_MODEL = 100
 ITER_DEC_EPSILON = 100
 ITER_UPDATE_HISTORY = 200
 ITER_SAVE_IMG = 200
 ITER_SAVE_WEIGHTS = 200
-REPLAY_BUFFER_SIZE = 1000
+REPLAY_BUFFER_SIZE = 6400
+LEARNING_RATE = 0.001
 
 
 class ReplayBuffer:
@@ -59,14 +60,14 @@ class ReplayBuffer:
 class Agent:
     def __init__(self, env: ShooterEnv):
         self._env = env
-        self._model = self._convmodel()
-        self._target_model = self._convmodel()
+        self._model = self._convmodel(LEARNING_RATE)
+        self._target_model = self._convmodel(LEARNING_RATE)
         self._rep = ReplayBuffer(REPLAY_BUFFER_SIZE)
         self._epsilon = EPSILON_INIT
         self.GAMMA = 0.99
         self._model.summary()
 
-    def _convmodel(self, lr: float = 0.001):
+    def _convmodel(self, lr:float):
         m = Sequential()
         m.add(
             Conv2D(
@@ -91,7 +92,8 @@ class Agent:
         )
         m.add(MaxPool2D((2, 2)))
         m.add(Flatten())
-        m.add(Dense(20, activation="relu", kernel_initializer="he_uniform"))
+        m.add(Dense(32, activation="relu", kernel_initializer="he_uniform"))
+        m.add(Dense(12, activation="relu", kernel_initializer="he_uniform")) 
         m.add(Dense(len(self._env.actions), activation=None))
         m.compile(Adam(lr), loss=tf.keras.losses.Huber())
         return m
@@ -130,7 +132,7 @@ class Agent:
                     f"/saved_weights/target_model_{i}_{datetime.now().strftime('%H_%M')}.h5"
                 )
 
-            log.debug(f"[TRAIN]: iter {i}")
+            log.info(f"[TRAIN]: iter {i}")
 
         return history
 
