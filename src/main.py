@@ -13,7 +13,7 @@ class Run:
 
 
 if __name__ == "__main__":
-    run = Run.TRAIN
+    run = Run.PLU
 
     if run == Run.TRAIN:
         game = Game(TRAIN_FPS, False, False)

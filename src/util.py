@@ -12,7 +12,12 @@ def parent_dir(currentframe: FrameType) -> Path:
 
 class FileSave:
     @classmethod
-    def fig(cls, arr: ndarray, name: str):
+    def fig_state(cls, arr: ndarray, name: str):
         plt.imshow(arr) 
-        plt.savefig(f"{parent_dir(inspect.currentframe()).parent}/figures/"
+        plt.savefig(f"{parent_dir(inspect.currentframe()).parent}/figures/state"
+            f"{datetime.now().strftime('%H_%M_%S')}_{name}.png")
+    
+    @classmethod
+    def fig_metrics(cls, name: str):
+        plt.savefig(f"{parent_dir(inspect.currentframe()).parent}/figures/metrics/"
             f"{datetime.now().strftime('%H_%M_%S')}_{name}.png")

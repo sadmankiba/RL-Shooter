@@ -10,6 +10,7 @@ from tensorflow.keras.losses import Huber
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import to_categorical
 import numpy as np
+import matplotlib.pyplot as plt
 from nptyping import NDArray
 
 from constants import UP, DOWN
@@ -120,11 +121,13 @@ class Agent:
                     f", mean reward: {history['mean_rew'][-1]}, loss: {history['mean_loss'][-1]}"
                 )
                 total_loss = 0
+                self._plot_metrics(history, i)
 
             if i != 0 and i % ITER_SAVE_IMG == 0:
                 batch = self._rep.sample(10)
                 for s, a, rew in zip(batch["s"], batch["a"], batch["rew"]):
-                    FileSave.fig(s, f"act_{Action.rev(a)}_rew_{rew}")
+                    FileSave.fig_state(s, f"act_{Action.rev(a)}"
+                    f"_q_{self._model.predict(self._prep_state_img(s)).tolist()}_iter_{i}")
 
             if i != 0 and i % ITER_SAVE_WEIGHTS == 0:
                 self._target_model.save(
@@ -135,6 +138,18 @@ class Agent:
             log.info(f"[TRAIN]: iter {i}")
 
         return history
+    
+    def _plot_metrics(self, history: dict, i: int):
+        plt.subplot(1, 2, 1)
+        plt.title("Mean reward per life")
+        plt.plot(history["mean_rew"])
+        plt.grid()
+
+        plt.subplot(1, 2, 2)
+        plt.title("TD loss history")
+        plt.plot(history["mean_loss"])
+        plt.grid()
+        FileSave.fig_metrics(f"iter_{i}")
 
     def play_from_saved(self, i: int):
         self._model = tf.keras.models.load_model(
@@ -191,8 +206,7 @@ class Agent:
         return np.argmax(q)
 
     def _evaluate(self, n_eps: int) -> float:
-        env = self._env.copy()
-        s = env.state
+        s = self._env.state
         rew_all = []
         for _ in range(n_eps):
             done = False
