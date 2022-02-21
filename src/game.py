@@ -46,6 +46,10 @@ GRAY = (40, 40, 50)
 STATE_IMG_H = 40
 STATE_IMG_W = 40
 
+REW_CONT = 0.04 
+REW_KILL = 0.5
+REW_DEAD = -1
+
 T_STATE = NDArray[(STATE_IMG_H, STATE_IMG_W), int]
 T_Action = int
 
@@ -295,14 +299,14 @@ class ShooterEnv:
     def step(self, a: T_Action) -> tuple[Any, int, bool]:
         prev_scr = self._game.score
         self._game.step(a)
-        rew = 0.05
-        rew += (self._game.score - prev_scr) / 2
+        rew = REW_CONT
+        rew += (self._game.score - prev_scr) * REW_KILL
         self._n_steps += 1
 
         done = False
         if (not self._game.running) or self._n_steps >= self._MAX_STEPS:
             done = True
-            rew += -1
+            rew += REW_DEAD
             self._game.start()
             self.games_played += 1
             self._n_steps = 0
