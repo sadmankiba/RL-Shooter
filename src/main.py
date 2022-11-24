@@ -13,7 +13,7 @@ class Run:
 
 
 if __name__ == "__main__":
-    run = Run.PLU
+    run = Run.PLAG
 
     if run == Run.TRAIN:
         game = Game(TRAIN_FPS, False, False)
@@ -25,7 +25,7 @@ if __name__ == "__main__":
         game = Game(TRAIN_FPS, True, True)
         env = ShooterEnv(game)
         agent = Agent(env)
-        agent.play_from_saved(120)
+        agent.play_from_saved(f"1300_11_33")
     else:
         game = Game(PLAY_FPS, True, True)
         while True:

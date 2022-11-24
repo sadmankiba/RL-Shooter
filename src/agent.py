@@ -17,17 +17,17 @@ from constants import UP, DOWN
 from game import ShooterEnv, T_STATE, T_Action, STATE_IMG_H, STATE_IMG_W, Action, log
 from util import FileSave, parent_dir
 
-EPSILON_INIT = 1.0
+EPSILON_INIT = 0.6
 EPSILON_DEC_SCALE = 0.99
 PLAY_STEPS = 32
 REPLAY_SAMPLE_TRAIN_SIZE = 32
-ITER_UPDATE_TARGET_MODEL = 100
-ITER_DEC_EPSILON = 100
-ITER_UPDATE_HISTORY = 200
-ITER_SAVE_IMG = 200
-ITER_SAVE_WEIGHTS = 200
+ITER_UPDATE_TARGET_MODEL = 50
+ITER_DEC_EPSILON = 50
+ITER_UPDATE_HISTORY = 100
+ITER_SAVE_IMG = 100
+ITER_SAVE_WEIGHTS = 100
 REPLAY_BUFFER_SIZE = 6400
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.0005
 
 
 class ReplayBuffer:
@@ -124,10 +124,12 @@ class Agent:
                 self._plot_metrics(history, i)
 
             if i != 0 and i % ITER_SAVE_IMG == 0:
-                batch = self._rep.sample(10)
+                batch = self._rep.sample(8)
                 for s, a, rew in zip(batch["s"], batch["a"], batch["rew"]):
+                    plt.close()
+                    plt.clf()
                     FileSave.fig_state(s, f"act_{Action.rev(a)}"
-                    f"_q_{self._model.predict(self._prep_state_img(s)).tolist()}_iter_{i}")
+                    f"_q_{np.round(self._model.predict(self._prep_state_img(s))[0]).tolist()}_iter_{i}")
 
             if i != 0 and i % ITER_SAVE_WEIGHTS == 0:
                 self._target_model.save(
@@ -140,6 +142,8 @@ class Agent:
         return history
     
     def _plot_metrics(self, history: dict, i: int):
+        plt.close()
+        plt.clf()
         plt.subplot(1, 2, 1)
         plt.title("Mean reward per life")
         plt.plot(history["mean_rew"])

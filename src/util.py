@@ -14,7 +14,7 @@ class FileSave:
     @classmethod
     def fig_state(cls, arr: ndarray, name: str):
         plt.imshow(arr) 
-        plt.savefig(f"{parent_dir(inspect.currentframe()).parent}/figures/state"
+        plt.savefig(f"{parent_dir(inspect.currentframe()).parent}/figures/state/"
             f"{datetime.now().strftime('%H_%M_%S')}_{name}.png")
     
     @classmethod
